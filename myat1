@@ -240,8 +240,7 @@ drone_movement = DroneMovement()
 
 # Ініціалізація pygame
 pygame.init()
-pygame.display.set_caption('Drone Hunter')
-screen = pygame.display.set_mode((1280, 720))
+
 
 while True:
     for event in pygame.event.get():
@@ -253,7 +252,7 @@ while True:
                 continue
             shot_sound.play()
             laser_pin.write(1)  # Увімкнути лазер при пострілі
-            time.sleep(0.1)  # Лазер увімкнений на 0.1 секунди
+            time.sleep(1)  # Лазер увімкнений на 0.1 секунди
             laser_pin.write(0)  # Вимкнути лазер
 
     handle_keys()

@@ -147,7 +147,7 @@ class DroneMovement:
         return (pred_x + drone_w // 2, pred_y + drone_h // 2)
 
     def get_current_center(self):
-        return (int(self.x + drone_w // 2), int(self.y + drone_w // 2))
+        return (int(self.x + drone_w // 2), int(self.y + drone_h // 2))
 
 def calculate_shot_accuracy(shot_x, shot_y, current_center, predicted_center):
     current_distance = math.sqrt((shot_x - current_center[0])**2 + (shot_y - current_center[1])**2)
@@ -171,9 +171,16 @@ def draw_explosion(frame, x, y, radius):
     cv2.circle(overlay, (x, y), radius, (0, 165, 255), -1)
     alpha = 0.5
     cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
+
+# Функція для обробки подій миші
 def mouse_callback(event, x, y, flags, param):
     global crosshair_x, crosshair_y, drone_active, score, explosion_effect
     global explosion_start_time, explosion_pos, current_accuracy, accuracy_display_time, laser_pin
+    
+    # Рух прицілу за мишкою
+    if event == cv2.EVENT_MOUSEMOVE:
+        crosshair_x = x
+        crosshair_y = y
     
     if event == cv2.EVENT_LBUTTONDOWN:
         if no_drone_period:
@@ -181,8 +188,8 @@ def mouse_callback(event, x, y, flags, param):
         
         shot_sound.play()
         laser_pin.write(1)  # Увімкнути лазер
-        pygame.time.delay(1000)  # Лазер горить 1 секунду
-        laser_pin.write(0)  # Вимкнути лазер ЗАВЖДИ
+        time.sleep(1)  # Лазер горить 1 секунду
+        laser_pin.write(0)  # Вимкнути лазер
         
         current_center = drone_movement.get_current_center()
         predicted_center = drone_movement.get_predicted_center()
@@ -207,8 +214,7 @@ def mouse_callback(event, x, y, flags, param):
                 current_accuracy = 0
         
         accuracy_display_time = time.time()
-        
-        accuracy_display_time = time.time()
+
 def handle_keys():
     global crosshair_x, crosshair_y
     
@@ -230,6 +236,7 @@ def handle_keys():
     if frame_w > 0 and frame_h > 0:
         servo_x.write(map_angle(crosshair_x, 0, frame_w, 30, 150))
         servo_y.write(map_angle(crosshair_y, 0, frame_h, 30, 120))
+
 def map_angle(value, left_min, left_max, right_min, right_max):
     left_span = left_max - left_min
     right_span = right_max - right_min
@@ -247,16 +254,18 @@ pygame.init()
 
 while True:
     for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            pygame.quit()
+            exit()
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if no_drone_period:
                 continue
             shot_sound.play()
             laser_pin.write(1)  # Увімкнути лазер
-            pygame.time.delay(1000)  # Затримка 1 секунда
-            laser_pin.write(0)  # Вимкнути лазер  # Вимкнути лазер
+            time.sleep(1)  # Лазер увімкнений на 1 секунду
+            laser_pin.write(0)  # Вимкнути лазер
 
     handle_keys()
-    
     ret, frame = camera.read()
     if not ret:
         break

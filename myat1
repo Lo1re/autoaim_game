@@ -171,16 +171,18 @@ def draw_explosion(frame, x, y, radius):
     cv2.circle(overlay, (x, y), radius, (0, 165, 255), -1)
     alpha = 0.5
     cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
-
 def mouse_callback(event, x, y, flags, param):
-    global drone_active, score, explosion_effect
-    global explosion_start_time, explosion_pos, current_accuracy, accuracy_display_time
+    global crosshair_x, crosshair_y, drone_active, score, explosion_effect
+    global explosion_start_time, explosion_pos, current_accuracy, accuracy_display_time, laser_pin
     
     if event == cv2.EVENT_LBUTTONDOWN:
         if no_drone_period:
             return
         
         shot_sound.play()
+        laser_pin.write(1)  # Увімкнути лазер
+        pygame.time.delay(1000)  # Лазер горить 1 секунду
+        laser_pin.write(0)  # Вимкнути лазер ЗАВЖДИ
         
         current_center = drone_movement.get_current_center()
         predicted_center = drone_movement.get_predicted_center()
@@ -202,31 +204,32 @@ def mouse_callback(event, x, y, flags, param):
                 explosion_pos = current_center
                 drone_movement.respawn()
             else:
-                               current_accuracy = 0
+                current_accuracy = 0
+        
         accuracy_display_time = time.time()
-
+        
+        accuracy_display_time = time.time()
 def handle_keys():
     global crosshair_x, crosshair_y
     
+    # Отримання натиснутих клавіш
     keys = pygame.key.get_pressed()
+    move_speed = 5
     
+    # Рух прицілу за WASD
     if keys[pygame.K_w]:
-        crosshair_y -= 5
+        crosshair_y = max(0, crosshair_y - move_speed)
     if keys[pygame.K_s]:
-        crosshair_y += 5
+        crosshair_y = min(frame_h - 1, crosshair_y + move_speed)
     if keys[pygame.K_a]:
-        crosshair_x -= 5
+        crosshair_x = max(0, crosshair_x - move_speed)
     if keys[pygame.K_d]:
-        crosshair_x += 5
+        crosshair_x = min(frame_w - 1, crosshair_x + move_speed)
     
-    crosshair_x = np.clip(crosshair_x, 0, frame_w)
-    crosshair_y = np.clip(crosshair_y, 0, frame_h)
-    
-    # Перевірка значень frame_w та frame_h перед викликом map_angle
+    # Оновлення серво-приводів
     if frame_w > 0 and frame_h > 0:
         servo_x.write(map_angle(crosshair_x, 0, frame_w, 30, 150))
         servo_y.write(map_angle(crosshair_y, 0, frame_h, 30, 120))
-
 def map_angle(value, left_min, left_max, right_min, right_max):
     left_span = left_max - left_min
     right_span = right_max - right_min
@@ -244,16 +247,13 @@ pygame.init()
 
 while True:
     for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            pygame.quit()
-            exit()
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if no_drone_period:
                 continue
             shot_sound.play()
-            laser_pin.write(1)  # Увімкнути лазер при пострілі
-            time.sleep(1)  # Лазер увімкнений на 0.1 секунди
-            laser_pin.write(0)  # Вимкнути лазер
+            laser_pin.write(1)  # Увімкнути лазер
+            pygame.time.delay(1000)  # Затримка 1 секунда
+            laser_pin.write(0)  # Вимкнути лазер  # Вимкнути лазер
 
     handle_keys()
     
@@ -284,11 +284,18 @@ while True:
     
     results = model(frame)
     
+    frame_h, frame_w = frame.shape[:2]
+    
+    # Логіка автонаведення
     if not no_drone_period:
         if auto_aim and drone_active and len(results[0].boxes) > 0:
             drone_predicted_x, drone_predicted_y = drone_movement.predict_position()
             crosshair_x = drone_predicted_x + drone_w // 2
             crosshair_y = drone_predicted_y + drone_h // 2
+            
+            # Оновлення серво-приводів при автонаведенні
+            servo_x.write(map_angle(crosshair_x, 0, frame_w, 30, 150))
+            servo_y.write(map_angle(crosshair_y, 0, frame_h, 30, 120))
             
             box = results[0].boxes[0]
             x1, y1, x2, y2 = map(int, box.xyxy[0])
